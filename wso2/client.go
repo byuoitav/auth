@@ -4,7 +4,6 @@ import (
 	"crypto/rsa"
 	"crypto/x509"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io/ioutil"
 	"net/http"
@@ -100,7 +99,7 @@ func (c *Client) ValidateJWT(j string) (map[string]interface{}, error) {
 	if err != nil {
 
 		// If we weren't able to figure out which key to use
-		if errors.Is(err, errCantIdentifyKey) {
+		if strings.Contains(err.Error(), errCantIdentifyKey.Error()) {
 
 			c.cacheMux.RLock()
 			for _, k := range c.keyCache {
@@ -123,6 +122,7 @@ func (c *Client) ValidateJWT(j string) (map[string]interface{}, error) {
 					return token.Claims.(jwt.MapClaims), nil
 				}
 			}
+			c.cacheMux.RUnlock()
 
 			// The last error will fall through the normal processing
 		}
