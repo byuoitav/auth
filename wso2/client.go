@@ -13,6 +13,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/byuoitav/common/log"
 	"github.com/dgrijalva/jwt-go"
 )
 
@@ -94,6 +95,7 @@ func (c *Client) ValidateJWT(j string) (map[string]interface{}, error) {
 		c.refreshKeyCache()
 	}
 
+	log.L.Debugf("Validating token...")
 	// Try to validate using automatic key selection
 	token, err := jwt.Parse(j, c.validationFunc(nil))
 	if err != nil {
@@ -101,20 +103,26 @@ func (c *Client) ValidateJWT(j string) (map[string]interface{}, error) {
 		// If we weren't able to figure out which key to use
 		if strings.Contains(err.Error(), errCantIdentifyKey.Error()) {
 
+			log.L.Debugf("key thumbprint not specified trying all keys")
+
 			c.cacheMux.RLock()
 			defer c.cacheMux.RUnlock()
-			for _, k := range c.keyCache {
+			for x5t, k := range c.keyCache {
+
+				log.L.Debugf("trying key: %s", x5t)
 
 				token, err := jwt.Parse(j, c.validationFunc(k))
 				if ve, ok := err.(*jwt.ValidationError); ok {
 
 					// if the error is due to invalid signature then continue
 					if ve.Errors&jwt.ValidationErrorSignatureInvalid != 0 {
+						log.L.Debugf("bad signature trying next key")
 						continue
 					}
 				}
 				// for any other error break because something else is wrong
 				if err != nil {
+					log.L.Debugf("Breakin due to other error")
 					break
 				}
 
@@ -188,6 +196,8 @@ func (c *Client) validationFunc(k *rsa.PublicKey) jwt.Keyfunc {
 
 func (c *Client) refreshKeyCache() error {
 
+	log.L.Debugf("Refreshing key cache")
+
 	// Get openid-configuration document
 	res, err := http.Get(fmt.Sprintf("%s/.well-known/openid-configuration", c.GatewayURL))
 	if err != nil {
@@ -220,7 +230,7 @@ func (c *Client) refreshKeyCache() error {
 
 	jwks := struct {
 		Keys []struct {
-			ID  string   `json:"kid"`
+			X5T string   `json:"x5t"`
 			X5C []string `json:"x5c"`
 		} `json:"keys"`
 	}{}
@@ -238,6 +248,7 @@ func (c *Client) refreshKeyCache() error {
 	if err != nil || expSeconds == 0 {
 		expSeconds = 3600
 	}
+	log.L.Debugf("cache expires in %d seconds", expSeconds)
 
 	// Add keys to cache
 	c.cacheMux.Lock()
@@ -250,7 +261,8 @@ func (c *Client) refreshKeyCache() error {
 			return fmt.Errorf("Failed to parse key: %w", err)
 		}
 
-		c.keyCache[k.ID] = cert
+		log.L.Debugf("inserting key into cache: %s", k.X5T)
+		c.keyCache[k.X5T] = cert
 	}
 
 	// Update cache expiry timestamp
