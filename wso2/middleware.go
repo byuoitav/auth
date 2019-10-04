@@ -4,22 +4,29 @@ import (
 	"context"
 	"crypto/rand"
 	"fmt"
-	"log"
 	"net/http"
+	"sync"
 	"time"
 
+	"github.com/byuoitav/common/log"
 	"github.com/dgrijalva/jwt-go"
 )
+
+var setup sync.Once
+var signingKey = make([]byte, 0)
 
 // AuthCodeMiddleware returns a handler that authenticates the end user via the
 // OAuth2 Authorization Code grant type with WSO2
 func (c *Client) AuthCodeMiddleware(next http.Handler) http.Handler {
 
-	signingKey := make([]byte, 64)
-	_, err := rand.Read(signingKey)
-	if err != nil {
-		log.Fatalf("Couldn't autogenerate signing key: %s", err)
-	}
+	setup.Do(func() {
+		signingKey := make([]byte, 64)
+		_, err := rand.Read(signingKey)
+		if err != nil {
+			log.L.Fatalf("Couldn't autogenerate signing key: %s", err)
+		}
+		log.L.Debugf("signingKey: %s", string(signingKey))
+	})
 
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 
@@ -29,7 +36,7 @@ func (c *Client) AuthCodeMiddleware(next http.Handler) http.Handler {
 
 			res, err := c.ValidateAuthorizationCode(authCode)
 			if err != nil {
-				log.Printf("Error while validating auth code: %s", err)
+				log.L.Errorf("Error while validating auth code: %s", err)
 				// Just continue down the chain without authenticating and let
 				// each application handle failed auth how they will
 				next.ServeHTTP(w, r)
@@ -39,7 +46,7 @@ func (c *Client) AuthCodeMiddleware(next http.Handler) http.Handler {
 			// Check the ID token for validity
 			claims, err := c.ValidateJWT(res.IDToken)
 			if err != nil {
-				log.Printf("Error while validating the ID Token: %s", err)
+				log.L.Errorf("Error while validating the ID Token: %s", err)
 				// Just continue down the chain without authenticating and let
 				// each application handle failed auth how they will
 				next.ServeHTTP(w, r)
@@ -53,7 +60,7 @@ func (c *Client) AuthCodeMiddleware(next http.Handler) http.Handler {
 
 			signedToken, err := token.SignedString([]byte(signingKey))
 			if err != nil {
-				log.Printf("Error while creating session jwt: %s", err)
+				log.L.Errorf("Error while creating session jwt: %s", err)
 				// Just continue down the chain without authenticating and let
 				// each application handle failed auth how they will
 				next.ServeHTTP(w, r)
@@ -72,6 +79,9 @@ func (c *Client) AuthCodeMiddleware(next http.Handler) http.Handler {
 			}
 
 			http.SetCookie(w, &sessionCookie)
+
+			// Remove query parameters
+			http.Redirect(w, r, c.CallbackURL, http.StatusFound)
 		}
 
 		// Check for existing session
@@ -89,7 +99,7 @@ func (c *Client) AuthCodeMiddleware(next http.Handler) http.Handler {
 			return []byte(signingKey), nil
 		})
 		if err != nil {
-			log.Printf("Error while parsing JWT: %s", err)
+			log.L.Errorf("Error while parsing Session JWT: %s", err)
 			http.Redirect(w, r, c.GetAuthCodeURL(), http.StatusSeeOther)
 		}
 
@@ -99,7 +109,7 @@ func (c *Client) AuthCodeMiddleware(next http.Handler) http.Handler {
 			t, err := time.Parse(time.RFC3339, exp.(string))
 			if err != nil {
 				// Token has no parsable expiration date restart
-				log.Printf("Error while parsing exp claim: %s", err)
+				log.L.Errorf("Error while parsing exp claim: %s", err)
 				http.Redirect(w, r, c.GetAuthCodeURL(), http.StatusSeeOther)
 			}
 
@@ -116,7 +126,7 @@ func (c *Client) AuthCodeMiddleware(next http.Handler) http.Handler {
 
 		}
 		// No exp claim
-		log.Printf("No EXP claim found")
+		log.L.Errorf("No EXP claim found")
 		http.Redirect(w, r, c.GetAuthCodeURL(), http.StatusSeeOther)
 
 	})

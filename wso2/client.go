@@ -1,11 +1,14 @@
 package wso2
 
 import (
+	"bytes"
 	"crypto/rsa"
-	"crypto/x509"
+	"encoding/base64"
+	"encoding/binary"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
+	"math/big"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -111,18 +114,24 @@ func (c *Client) ValidateJWT(j string) (map[string]interface{}, error) {
 
 				log.L.Debugf("trying key: %s", x5t)
 
-				token, err := jwt.Parse(j, c.validationFunc(k))
-				if ve, ok := err.(*jwt.ValidationError); ok {
+				token, newErr := jwt.Parse(j, c.validationFunc(k))
+				if ve, ok := newErr.(*jwt.ValidationError); ok {
 
 					// if the error is due to invalid signature then continue
 					if ve.Errors&jwt.ValidationErrorSignatureInvalid != 0 {
 						log.L.Debugf("bad signature trying next key")
 						continue
 					}
+
+					// Ignore issued at errors due to WSO2
+					if ve.Errors&jwt.ValidationErrorIssuedAt != 0 {
+						return token.Claims.(jwt.MapClaims), nil
+					}
 				}
 				// for any other error break because something else is wrong
-				if err != nil {
-					log.L.Debugf("Breakin due to other error")
+				if newErr != nil {
+					log.L.Debugf("Breaking due to other error")
+					err = newErr
 					break
 				}
 
@@ -176,9 +185,13 @@ func (c *Client) validationFunc(k *rsa.PublicKey) jwt.Keyfunc {
 		}
 
 		// If a key has been passed in use that
+		log.L.Debugf("Key passed in: %s", k)
 		if k != nil {
+			log.L.Debugf("Returning passed in key")
 			return k, nil
 		}
+
+		log.L.Debugf("Trying to auto identify necessary key")
 
 		// Otherwise, try to determine the key
 		if x5t, ok := token.Header["x5t"].(string); ok {
@@ -230,8 +243,9 @@ func (c *Client) refreshKeyCache() error {
 
 	jwks := struct {
 		Keys []struct {
-			X5T string   `json:"x5t"`
-			X5C []string `json:"x5c"`
+			X5T string `json:"x5t"`
+			E   string `json:"e"`
+			N   string `json:"n"`
 		} `json:"keys"`
 	}{}
 
@@ -257,7 +271,7 @@ func (c *Client) refreshKeyCache() error {
 	c.keyCache = make(map[string]*rsa.PublicKey)
 
 	for _, k := range jwks.Keys {
-		cert, err := x509.ParsePKCS1PublicKey([]byte(k.X5C[0]))
+		cert, err := eNToPubKey(k.E, k.N)
 		if err != nil {
 			log.L.Errorf("Failed to parse key: %s", err)
 			return fmt.Errorf("Failed to parse key: %w", err)
@@ -271,4 +285,37 @@ func (c *Client) refreshKeyCache() error {
 	c.keyCacheExp = time.Now().Add(time.Second * time.Duration(expSeconds))
 
 	return nil
+}
+
+func eNToPubKey(e, n string) (*rsa.PublicKey, error) {
+
+	ebytes, err := base64.StdEncoding.DecodeString(e)
+	if err != nil {
+		return nil, fmt.Errorf("Error while decoding e: %w", err)
+	}
+
+	if len(ebytes) < 8 {
+		padding := make([]byte, 8-len(ebytes), 8)
+		ebytes = append(padding, ebytes...)
+	}
+
+	var eInt uint64
+	err = binary.Read(bytes.NewReader(ebytes), binary.BigEndian, &eInt)
+	if err != nil {
+		return nil, fmt.Errorf("Error while reading e: %w", err)
+	}
+
+	nBytes, err := base64.RawURLEncoding.DecodeString(n)
+	if err != nil {
+		return nil, fmt.Errorf("Error while decoding n: %w", err)
+	}
+
+	nInt := big.NewInt(0)
+	nInt.SetBytes(nBytes)
+
+	return &rsa.PublicKey{
+		N: nInt,
+		E: int(eInt),
+	}, nil
+
 }
