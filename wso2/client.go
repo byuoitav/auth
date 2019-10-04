@@ -252,12 +252,14 @@ func (c *Client) refreshKeyCache() error {
 
 	// Add keys to cache
 	c.cacheMux.Lock()
+	defer c.cacheMux.Unlock()
 
 	c.keyCache = make(map[string]*rsa.PublicKey)
 
 	for _, k := range jwks.Keys {
 		cert, err := x509.ParsePKCS1PublicKey([]byte(k.X5C[0]))
 		if err != nil {
+			log.L.Errorf("Failed to parse key: %s", err)
 			return fmt.Errorf("Failed to parse key: %w", err)
 		}
 
@@ -267,8 +269,6 @@ func (c *Client) refreshKeyCache() error {
 
 	// Update cache expiry timestamp
 	c.keyCacheExp = time.Now().Add(time.Second * time.Duration(expSeconds))
-
-	c.cacheMux.Unlock()
 
 	return nil
 }
