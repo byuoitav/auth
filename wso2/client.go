@@ -102,6 +102,7 @@ func (c *Client) ValidateJWT(j string) (map[string]interface{}, error) {
 		if strings.Contains(err.Error(), errCantIdentifyKey.Error()) {
 
 			c.cacheMux.RLock()
+			defer c.cacheMux.RUnlock()
 			for _, k := range c.keyCache {
 
 				token, err := jwt.Parse(j, c.validationFunc(k))
@@ -122,7 +123,6 @@ func (c *Client) ValidateJWT(j string) (map[string]interface{}, error) {
 					return token.Claims.(jwt.MapClaims), nil
 				}
 			}
-			c.cacheMux.RUnlock()
 
 			// The last error will fall through the normal processing
 		}
