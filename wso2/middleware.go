@@ -8,6 +8,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/byuoitav/auth/middleware"
 	"github.com/byuoitav/common/log"
 	"github.com/dgrijalva/jwt-go"
 )
@@ -29,6 +30,12 @@ func (c *Client) AuthCodeMiddleware(next http.Handler) http.Handler {
 	})
 
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+
+		// If the request has already been authenticated then skip
+		if middleware.Authenticated(r) {
+			next.ServeHTTP(w, r)
+			return
+		}
 
 		// Check for authorization code from just having logged in
 		authCode := r.FormValue("code")
@@ -123,6 +130,11 @@ func (c *Client) AuthCodeMiddleware(next http.Handler) http.Handler {
 				next.ServeHTTP(w, r.WithContext(ctx))
 				return
 			}
+
+			// JWT is expired
+			log.L.Errorf("Session JWT Expired")
+			http.Redirect(w, r, c.GetAuthCodeURL(), http.StatusSeeOther)
+			return
 
 		}
 		// No exp claim
