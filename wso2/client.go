@@ -66,7 +66,8 @@ func (c *Client) ValidateAuthorizationCode(ac string) (AuthCodeResponse, error) 
 	}
 	defer res.Body.Close()
 	if res.StatusCode != http.StatusOK {
-		return AuthCodeResponse{}, fmt.Errorf("Got non 200 response back from the token endpoint: %d %s", res.StatusCode, res.Body)
+		body, _ := ioutil.ReadAll(res.Body)
+		return AuthCodeResponse{}, fmt.Errorf("Got non 200 response back from the token endpoint: %d %s", res.StatusCode, body)
 	}
 
 	// Read the body and parse it
