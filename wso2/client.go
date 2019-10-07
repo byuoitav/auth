@@ -61,8 +61,12 @@ func (c *Client) ValidateAuthorizationCode(ac string) (AuthCodeResponse, error) 
 	req.SetBasicAuth(c.ClientID, c.ClientSecret)
 	req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
 	res, err := http.DefaultClient.Do(req)
-	if err != nil || res.StatusCode != http.StatusOK {
+	if err != nil {
 		return AuthCodeResponse{}, fmt.Errorf("Error while making Authorization Code request: %w", err)
+	}
+	defer res.Body.Close()
+	if res.StatusCode != http.StatusOK {
+		return AuthCodeResponse{}, fmt.Errorf("Got non 200 response back from the token endpoint: %d %s", res.StatusCode, res.Body)
 	}
 
 	// Read the body and parse it
