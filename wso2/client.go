@@ -32,6 +32,10 @@ type Client struct {
 	keyCache     map[string]*rsa.PublicKey
 	keyCacheExp  time.Time
 	cacheMux     sync.RWMutex
+
+	token    string
+	tokenExp time.Time
+	tokenMux sync.RWMutex
 }
 
 // AuthCodeResponse represents the response given by WSO2 when exchanging an
