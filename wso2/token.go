@@ -19,7 +19,10 @@ func (c *Client) GetToken() (string, error) {
 	// If the current token is expired or does not exist then refresh
 	if c.tokenExp.IsZero() || time.Now().After(c.tokenExp) {
 		c.tokenMux.RUnlock()
-		c.refreshToken()
+		err := c.refreshToken()
+		if err != nil {
+			return "", err
+		}
 		c.tokenMux.RLock()
 	}
 
@@ -73,8 +76,8 @@ func (c *Client) refreshToken() error {
 	}
 
 	tokenRes := struct {
-		expiresIn int    `json:"expires_in"`
-		token     string `json:"access_token"`
+		ExpiresIn int    `json:"expires_in"`
+		Token     string `json:"access_token"`
 	}{}
 
 	err = json.Unmarshal(body, &tokenRes)
@@ -82,8 +85,8 @@ func (c *Client) refreshToken() error {
 		return fmt.Errorf("Error while parsing refresh token call response body: %w", err)
 	}
 
-	c.token = tokenRes.token
-	c.tokenExp = time.Now().Add(time.Second * time.Duration(tokenRes.expiresIn))
+	c.token = tokenRes.Token
+	c.tokenExp = time.Now().Add(time.Second * time.Duration(tokenRes.ExpiresIn))
 
 	return nil
 
