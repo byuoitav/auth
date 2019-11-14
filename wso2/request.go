@@ -26,7 +26,7 @@ func (c *Client) Do(req *http.Request) (*http.Response, error) {
 // Get performs a GET request to the given url utilizing the WSO2 client
 func (c *Client) Get(url string) (*http.Response, error) {
 
-	req, err := http.NewRequest("Get", url, nil)
+	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
 		return nil, fmt.Errorf("Error while building request: %w", err)
 	}
