@@ -115,8 +115,7 @@ func (c *Client) ValidateJWT(j string) (map[string]interface{}, error) {
 
 			c.cacheMux.RLock()
 			defer c.cacheMux.RUnlock()
-			for x5t, k := range c.keyCache {
-
+			for _, k := range c.keyCache {
 				token, newErr := jwt.Parse(j, c.validationFunc(k))
 				if ve, ok := newErr.(*jwt.ValidationError); ok {
 
