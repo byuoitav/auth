@@ -16,7 +16,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/byuoitav/common/log"
 	"github.com/dgrijalva/jwt-go"
 )
 
@@ -107,7 +106,6 @@ func (c *Client) ValidateJWT(j string) (map[string]interface{}, error) {
 		c.refreshKeyCache()
 	}
 
-	log.L.Debugf("Validating token...")
 	// Try to validate using automatic key selection
 	token, err := jwt.Parse(j, c.validationFunc(nil))
 	if err != nil {
@@ -115,20 +113,15 @@ func (c *Client) ValidateJWT(j string) (map[string]interface{}, error) {
 		// If we weren't able to figure out which key to use
 		if strings.Contains(err.Error(), errCantIdentifyKey.Error()) {
 
-			log.L.Debugf("key thumbprint not specified trying all keys")
-
 			c.cacheMux.RLock()
 			defer c.cacheMux.RUnlock()
 			for x5t, k := range c.keyCache {
-
-				log.L.Debugf("trying key: %s", x5t)
 
 				token, newErr := jwt.Parse(j, c.validationFunc(k))
 				if ve, ok := newErr.(*jwt.ValidationError); ok {
 
 					// if the error is due to invalid signature then continue
 					if ve.Errors&jwt.ValidationErrorSignatureInvalid != 0 {
-						log.L.Debugf("bad signature trying next key")
 						continue
 					}
 
@@ -139,7 +132,6 @@ func (c *Client) ValidateJWT(j string) (map[string]interface{}, error) {
 				}
 				// for any other error break because something else is wrong
 				if newErr != nil {
-					log.L.Debugf("Breaking due to other error")
 					err = newErr
 					break
 				}
@@ -194,13 +186,9 @@ func (c *Client) validationFunc(k *rsa.PublicKey) jwt.Keyfunc {
 		}
 
 		// If a key has been passed in use that
-		log.L.Debugf("Key passed in: %s", k)
 		if k != nil {
-			log.L.Debugf("Returning passed in key")
 			return k, nil
 		}
-
-		log.L.Debugf("Trying to auto identify necessary key")
 
 		// Otherwise, try to determine the key
 		if x5t, ok := token.Header["x5t"].(string); ok {
@@ -217,8 +205,6 @@ func (c *Client) validationFunc(k *rsa.PublicKey) jwt.Keyfunc {
 }
 
 func (c *Client) refreshKeyCache() error {
-
-	log.L.Debugf("Refreshing key cache")
 
 	// Get openid-configuration document
 	res, err := http.Get(fmt.Sprintf("%s/.well-known/openid-configuration", c.GatewayURL))
@@ -271,7 +257,6 @@ func (c *Client) refreshKeyCache() error {
 	if err != nil || expSeconds == 0 {
 		expSeconds = 3600
 	}
-	log.L.Debugf("cache expires in %d seconds", expSeconds)
 
 	// Add keys to cache
 	c.cacheMux.Lock()
@@ -282,11 +267,9 @@ func (c *Client) refreshKeyCache() error {
 	for _, k := range jwks.Keys {
 		cert, err := eNToPubKey(k.E, k.N)
 		if err != nil {
-			log.L.Errorf("Failed to parse key: %s", err)
 			return fmt.Errorf("Failed to parse key: %w", err)
 		}
 
-		log.L.Debugf("inserting key into cache: %s", k.X5T)
 		c.keyCache[k.X5T] = cert
 	}
 
