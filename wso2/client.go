@@ -35,6 +35,13 @@ type Client struct {
 	token    string
 	tokenExp time.Time
 	tokenMux sync.RWMutex
+
+	stateCache map[string]state
+	stateMux   sync.RWMutex
+}
+
+type state struct {
+	URL *url.URL
 }
 
 // AuthCodeResponse represents the response given by WSO2 when exchanging an
@@ -90,11 +97,12 @@ func (c *Client) ValidateAuthorizationCode(ac string) (AuthCodeResponse, error) 
 }
 
 // GetAuthCodeURL returns the authorize URL to redirect users to for the
-// Authorization Code OAuth2.0 Grant type
-func (c *Client) GetAuthCodeURL() string {
+// Authorization Code OAuth2.0 Grant type. It expects a state identifier to be
+// passed in, this identifier helps identify state when the response comes back
+func (c *Client) GetAuthCodeURL(state string) string {
 
-	return fmt.Sprintf("%s/authorize?response_type=code&client_id=%s&redirect_uri=%s&scope=openid&state=newstate",
-		c.GatewayURL, c.ClientID, c.CallbackURL)
+	return fmt.Sprintf("%s/authorize?response_type=code&client_id=%s&redirect_uri=%s&scope=openid&state=%s",
+		c.GatewayURL, c.ClientID, c.CallbackURL, state)
 
 }
 

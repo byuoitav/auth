@@ -10,6 +10,7 @@ import (
 
 	"github.com/byuoitav/auth/middleware"
 	"github.com/dgrijalva/jwt-go"
+	"github.com/segmentio/ksuid"
 )
 
 var setup sync.Once
@@ -81,15 +82,37 @@ func (c *Client) AuthCodeMiddleware(next http.Handler) http.Handler {
 
 			http.SetCookie(w, &sessionCookie)
 
-			// Remove query parameters
-			http.Redirect(w, r, c.CallbackURL, http.StatusFound)
+			// Try to redirect to original destination
+			state := r.FormValue("state")
+			if state == "" {
+				// If we can't find state just remove the query parameters
+				http.Redirect(w, r, c.CallbackURL, http.StatusFound)
+				return
+			}
+
+			// Pull state from cache and delete if exists
+			c.stateMux.RLock()
+			s, ok := c.stateCache[state]
+			if ok {
+				delete(c.stateCache, state)
+			}
+			c.stateMux.RUnlock()
+
+			// If state doesn't exist in cache just remove query parameters
+			if !ok {
+				http.Redirect(w, r, c.CallbackURL, http.StatusFound)
+				return
+			}
+
+			// Redirect to original destination
+			http.Redirect(w, r, s.URL.String(), http.StatusFound)
 		}
 
 		// Check for existing session
 		j, err := r.Cookie("JWT-TOKEN")
 		if err != nil {
 			// No existing session, redirect to login
-			http.Redirect(w, r, c.GetAuthCodeURL(), http.StatusSeeOther)
+			c.redirectToLogin(w, r)
 			return
 		}
 
@@ -100,7 +123,8 @@ func (c *Client) AuthCodeMiddleware(next http.Handler) http.Handler {
 			return []byte(signingKey), nil
 		})
 		if err != nil {
-			http.Redirect(w, r, c.GetAuthCodeURL(), http.StatusSeeOther)
+			c.redirectToLogin(w, r)
+			return
 		}
 
 		exp, ok := token.Claims.(jwt.MapClaims)["exp"]
@@ -109,7 +133,8 @@ func (c *Client) AuthCodeMiddleware(next http.Handler) http.Handler {
 			t, err := time.Parse(time.RFC3339, exp.(string))
 			if err != nil {
 				// Token has no parsable expiration date restart
-				http.Redirect(w, r, c.GetAuthCodeURL(), http.StatusSeeOther)
+				c.redirectToLogin(w, r)
+				return
 			}
 
 			//the jwt is still valid
@@ -124,12 +149,29 @@ func (c *Client) AuthCodeMiddleware(next http.Handler) http.Handler {
 			}
 
 			// JWT is expired
-			http.Redirect(w, r, c.GetAuthCodeURL(), http.StatusSeeOther)
+			c.redirectToLogin(w, r)
 			return
 
 		}
 		// No exp claim
-		http.Redirect(w, r, c.GetAuthCodeURL(), http.StatusSeeOther)
+		c.redirectToLogin(w, r)
 
 	})
+}
+
+func (c *Client) redirectToLogin(w http.ResponseWriter, r *http.Request) {
+	// Save state
+	s := state{
+		URL: r.URL,
+	}
+
+	guid := ksuid.New().String()
+
+	// Store state
+	c.stateMux.Lock()
+	c.stateCache[guid] = s
+	c.stateMux.Unlock()
+
+	// Redirect
+	http.Redirect(w, r, c.GetAuthCodeURL(guid), http.StatusSeeOther)
 }
