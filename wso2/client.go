@@ -24,10 +24,10 @@ var errCantIdentifyKey = fmt.Errorf("Unable to identify key used for signing")
 // Client represents an instance of a WSO2 client and contains all the
 // configuration values necessary to run
 type Client struct {
-	GatewayURL   string
-	ClientID     string
-	ClientSecret string
-	CallbackURL  string
+	gatewayURL   string
+	clientID     string
+	clientSecret string
+	callbackURL  string
 	keyCache     map[string]*rsa.PublicKey
 	keyCacheExp  time.Time
 	cacheMux     sync.RWMutex
@@ -42,6 +42,21 @@ type Client struct {
 
 type state struct {
 	URL *url.URL
+}
+
+// New returns a new WSO2 client that uses the given credentials, gateway,
+// and callback url
+func New(clientID, clientSecret, gatewayURL, callbackURL string) *Client {
+	c := Client{
+		clientID:     clientID,
+		clientSecret: clientSecret,
+		gatewayURL:   gatewayURL,
+		callbackURL:  callbackURL,
+
+		stateCache: make(map[string]state),
+	}
+
+	return &c
 }
 
 // AuthCodeResponse represents the response given by WSO2 when exchanging an
@@ -60,15 +75,15 @@ func (c *Client) ValidateAuthorizationCode(ac string) (AuthCodeResponse, error) 
 	data := url.Values{}
 	data.Set("grant_type", "authorization_code")
 	data.Set("code", ac)
-	data.Set("redirect_uri", c.CallbackURL)
+	data.Set("redirect_uri", c.callbackURL)
 
 	// Send back the auth code in exchange for a token and refresh token
-	req, err := http.NewRequest("POST", fmt.Sprintf("%s/token", c.GatewayURL), strings.NewReader(data.Encode()))
+	req, err := http.NewRequest("POST", fmt.Sprintf("%s/token", c.gatewayURL), strings.NewReader(data.Encode()))
 	if err != nil {
 		return AuthCodeResponse{}, fmt.Errorf("Error while trying to create authorization code request: %w", err)
 	}
 
-	req.SetBasicAuth(c.ClientID, c.ClientSecret)
+	req.SetBasicAuth(c.clientID, c.clientSecret)
 	req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
 	res, err := http.DefaultClient.Do(req)
 	if err != nil {
@@ -102,7 +117,7 @@ func (c *Client) ValidateAuthorizationCode(ac string) (AuthCodeResponse, error) 
 func (c *Client) GetAuthCodeURL(state string) string {
 
 	return fmt.Sprintf("%s/authorize?response_type=code&client_id=%s&redirect_uri=%s&scope=openid&state=%s",
-		c.GatewayURL, c.ClientID, c.CallbackURL, state)
+		c.gatewayURL, c.clientID, c.callbackURL, state)
 
 }
 
@@ -111,7 +126,8 @@ func (c *Client) ValidateJWT(j string) (map[string]interface{}, error) {
 
 	// Refresh the cache if it is not set or expired
 	if c.keyCacheExp.IsZero() || time.Now().After(c.keyCacheExp) {
-		c.refreshKeyCache()
+		// Ignore an error from refresh key cache and try to validate anyways
+		_ = c.refreshKeyCache()
 	}
 
 	// Try to validate using automatic key selection
@@ -187,7 +203,7 @@ func (c *Client) validationFunc(k *rsa.PublicKey) jwt.Keyfunc {
 
 		// Check that the issuer is who we expect
 		if iss, ok := claims["iss"].(string); ok {
-			if iss != c.GatewayURL && !strings.HasPrefix(iss, "https://wso2-is.byu.edu") {
+			if iss != c.gatewayURL && !strings.HasPrefix(iss, "https://wso2-is.byu.edu") {
 				return nil, fmt.Errorf("Unexpected issuer: %s", iss)
 			}
 		}
@@ -214,7 +230,7 @@ func (c *Client) validationFunc(k *rsa.PublicKey) jwt.Keyfunc {
 func (c *Client) refreshKeyCache() error {
 
 	// Get openid-configuration document
-	res, err := http.Get(fmt.Sprintf("%s/.well-known/openid-configuration", c.GatewayURL))
+	res, err := http.Get(fmt.Sprintf("%s/.well-known/openid-configuration", c.gatewayURL))
 	if err != nil {
 		return fmt.Errorf("Error while trying to get openid configuration: %w", err)
 	}

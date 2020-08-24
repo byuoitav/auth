@@ -86,7 +86,7 @@ func (c *Client) AuthCodeMiddleware(next http.Handler) http.Handler {
 			state := r.FormValue("state")
 			if state == "" {
 				// If we can't find state just remove the query parameters
-				http.Redirect(w, r, c.CallbackURL, http.StatusFound)
+				http.Redirect(w, r, c.callbackURL, http.StatusFound)
 				return
 			}
 
@@ -100,7 +100,7 @@ func (c *Client) AuthCodeMiddleware(next http.Handler) http.Handler {
 
 			// If state doesn't exist in cache just remove query parameters
 			if !ok {
-				http.Redirect(w, r, c.CallbackURL, http.StatusFound)
+				http.Redirect(w, r, c.callbackURL, http.StatusFound)
 				return
 			}
 

@@ -46,7 +46,7 @@ func (c *Client) refreshToken() error {
 	c.tokenMux.Lock()
 	defer c.tokenMux.Unlock()
 
-	refreshURI := fmt.Sprintf("%s/token", c.GatewayURL)
+	refreshURI := fmt.Sprintf("%s/token", c.gatewayURL)
 
 	data := url.Values{}
 	data.Set("grant_type", "client_credentials")
@@ -56,7 +56,7 @@ func (c *Client) refreshToken() error {
 		return fmt.Errorf("Error while trying to build request: %w", err)
 	}
 
-	req.SetBasicAuth(c.ClientID, c.ClientSecret)
+	req.SetBasicAuth(c.clientID, c.clientSecret)
 	req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
 
 	res, err := http.DefaultClient.Do(req)
