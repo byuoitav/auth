@@ -35,13 +35,6 @@ type Client struct {
 	token    string
 	tokenExp time.Time
 	tokenMux sync.RWMutex
-
-	stateCache map[string]state
-	stateMux   sync.RWMutex
-}
-
-type state struct {
-	URL *url.URL
 }
 
 // New returns a new WSO2 client that uses the given credentials, gateway,
@@ -52,8 +45,6 @@ func New(clientID, clientSecret, gatewayURL, callbackURL string) *Client {
 		clientSecret: clientSecret,
 		gatewayURL:   gatewayURL,
 		callbackURL:  callbackURL,
-
-		stateCache: make(map[string]state),
 	}
 
 	return &c
@@ -66,6 +57,11 @@ type AuthCodeResponse struct {
 	RefreshToken string `json:"refresh_token"`
 	AccessToken  string `json:"access_token"`
 	IDToken      string `json:"id_token"`
+}
+
+// CallbackURL returns the callback url set for the client
+func (c *Client) CallbackURL() string {
+	return c.callbackURL
 }
 
 // ValidateAuthorizationCode validates the given authorization code and returns
