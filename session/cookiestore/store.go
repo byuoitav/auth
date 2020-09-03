@@ -102,8 +102,8 @@ func (s *Store) Get(r *http.Request, name string) (*session.Session, error) {
 		}
 
 		// if the jwt has passed inactivity window
-		if it.Before(time.Now()) {
-			return s.new(name), fmt.Errorf("Session cookie expired")
+		if time.Since(it) > time.Duration(s.ttl)*time.Minute {
+			return s.new(name), fmt.Errorf("Session inactivity limit passed")
 		}
 	}
 
