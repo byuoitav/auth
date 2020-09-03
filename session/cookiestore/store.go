@@ -143,6 +143,7 @@ func (s *Store) Save(r *http.Request, w http.ResponseWriter, se *session.Session
 		Value:    signedToken,
 		HttpOnly: false,
 		Secure:   false,
+		Path:     "/",
 		Domain:   domain,
 	}
 
@@ -157,6 +158,7 @@ func (s *Store) Drop(r *http.Request, w http.ResponseWriter, name string) error 
 		Value:    "",
 		HttpOnly: false,
 		Secure:   false,
+		Path:     "/",
 		Domain:   r.URL.Hostname(),
 	}
 
