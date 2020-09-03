@@ -104,6 +104,7 @@ func (c *Client) AuthCodeMiddleware(sessionStore session.Store, sessionName stri
 
 				// Redirect to original destination
 				http.Redirect(w, r, s.URL.String(), http.StatusFound)
+				return
 			}
 
 			// If there is an existing valid session
