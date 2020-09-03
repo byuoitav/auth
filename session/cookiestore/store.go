@@ -124,7 +124,7 @@ func (s *Store) Save(r *http.Request, w http.ResponseWriter, se *session.Session
 	}
 
 	// Update iat (issued at) claim to now
-	se.Values["iat"] = time.Now().Format(time.RFC3339)
+	claim.Values["iat"] = time.Now().Format(time.RFC3339)
 
 	// Create and sign token
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
