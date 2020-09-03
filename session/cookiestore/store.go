@@ -57,7 +57,7 @@ func (s *Store) Get(r *http.Request, name string) (*session.Session, error) {
 	token, err := jwt.Parse(j.Value, func(T *jwt.Token) (interface{}, error) {
 		if T.Method.Alg() != "HS256" {
 			// Invalid signing method, return new session
-			return s.new(name), fmt.Errorf("Invalid signing method %v", T.Method.Alg())
+			return "", fmt.Errorf("Invalid signing method %v", T.Method.Alg())
 		}
 		return []byte(s.key), nil
 	})
