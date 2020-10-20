@@ -28,6 +28,7 @@ func AVAPIKeyMiddleware() func(http.Handler) http.Handler {
 			// Put the api key found into the context and continue
 			ctx := r.Context()
 			ctx = context.WithValue(ctx, _avAPIKeyContextKey, apiKey)
+			ctx = context.WithValue(ctx, "passed-auth-check", "true")
 			next.ServeHTTP(w, r.WithContext(ctx))
 			return
 		})
