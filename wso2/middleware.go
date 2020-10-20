@@ -126,3 +126,40 @@ func (c *Client) AuthCodeMiddleware(sessionStore session.Store, sessionName stri
 		})
 	}
 }
+
+func (c *Client) JWTValidationMiddleware() func(http.Handler) http.Handler {
+
+	return func(next http.Handler) http.Handler {
+
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+
+			jwt := r.Header.Get("X-JWT-Assertion")
+			if jwt == "" {
+				// Can't validate anything skip
+				next.ServeHTTP(w, r)
+				return
+			}
+
+			claims, err := c.ValidateJWT(jwt)
+			if err != nil {
+				// JWT invalid or failed to validate
+				ctx := context.WithValue(r.Context(), "passed-auth-check", "false")
+				next.ServeHTTP(w, r.WithContext(ctx))
+				return
+			}
+
+			ctx := r.Context()
+
+			// Check for resource owner
+			if ro, ok := claims["http://byu.edu/claims/resourceowner_net_id"]; ok {
+				ctx = context.WithValue(ctx, "user", ro)
+			} else {
+				ctx = context.WithValue(ctx, "user", claims["http://byu.edu/claims/client_net_id"])
+			}
+
+			// Passed auth check, continue on down the chain
+			ctx = context.WithValue(ctx, "passed-auth-check", "true")
+			next.ServeHTTP(w, r.WithContext(ctx))
+		})
+	}
+}
