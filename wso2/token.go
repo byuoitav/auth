@@ -14,17 +14,20 @@ import (
 func (c *Client) GetToken() (string, error) {
 
 	c.tokenMux.RLock()
-	defer c.tokenMux.RUnlock()
 
 	// If the current token is expired or does not exist then refresh
 	if c.tokenExp.IsZero() || time.Now().After(c.tokenExp) {
 		c.tokenMux.RUnlock()
+
 		err := c.refreshToken()
 		if err != nil {
 			return "", err
 		}
+
 		c.tokenMux.RLock()
 	}
+
+	defer c.tokenMux.RUnlock()
 
 	return c.token, nil
 }
