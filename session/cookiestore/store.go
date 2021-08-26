@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/byuoitav/auth/session"
-	"github.com/dgrijalva/jwt-go"
+	"github.com/golang-jwt/jwt/v4"
 )
 
 type Store struct {
