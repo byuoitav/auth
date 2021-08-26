@@ -153,8 +153,10 @@ func (c *Client) JWTValidationMiddleware() func(http.Handler) http.Handler {
 			// Check for resource owner
 			if ro, ok := claims["http://byu.edu/claims/resourceowner_net_id"]; ok {
 				ctx = context.WithValue(ctx, "user", ro)
+				ctx = context.WithValue(ctx, "userBYUID", claims["http://byu.edu/claims/resourceowner_byu_id"])
 			} else {
 				ctx = context.WithValue(ctx, "user", claims["http://byu.edu/claims/client_net_id"])
+				ctx = context.WithValue(ctx, "userBYUID", claims["http://byu.edu/claims/client_byu_id"])
 			}
 
 			// Passed auth check, continue on down the chain
