@@ -74,7 +74,7 @@ func (c *Client) ValidateAuthorizationCode(ac string) (AuthCodeResponse, error) 
 	data.Set("redirect_uri", c.callbackURL)
 
 	// Send back the auth code in exchange for a token and refresh token
-	req, err := http.NewRequest("POST", fmt.Sprintf("%s/token", c.gatewayURL), strings.NewReader(data.Encode()))
+	req, err := http.NewRequest("POST", fmt.Sprintf("%stoken", c.gatewayURL), strings.NewReader(data.Encode()))
 	if err != nil {
 		return AuthCodeResponse{}, fmt.Errorf("Error while trying to create authorization code request: %w", err)
 	}
@@ -112,7 +112,7 @@ func (c *Client) ValidateAuthorizationCode(ac string) (AuthCodeResponse, error) 
 // passed in, this identifier helps identify state when the response comes back
 func (c *Client) GetAuthCodeURL(state string) string {
 
-	return fmt.Sprintf("%s/authorize?response_type=code&client_id=%s&redirect_uri=%s&scope=openid&state=%s",
+	return fmt.Sprintf("%sauthorize?response_type=code&client_id=%s&redirect_uri=%s&scope=openid&state=%s",
 		c.gatewayURL, c.clientID, c.callbackURL, state)
 
 }
@@ -226,7 +226,7 @@ func (c *Client) validationFunc(k *rsa.PublicKey) jwt.Keyfunc {
 func (c *Client) refreshKeyCache() error {
 
 	// Get openid-configuration document
-	res, err := http.Get(fmt.Sprintf("%s/.well-known/openid-configuration", c.gatewayURL))
+	res, err := http.Get(fmt.Sprintf("%s.well-known/openid-configuration", c.gatewayURL))
 	if err != nil {
 		return fmt.Errorf("Error while trying to get openid configuration: %w", err)
 	}

@@ -49,7 +49,7 @@ func (c *Client) refreshToken() error {
 	c.tokenMux.Lock()
 	defer c.tokenMux.Unlock()
 
-	refreshURI := fmt.Sprintf("%s/token", c.gatewayURL)
+	refreshURI := fmt.Sprintf("%stoken", c.gatewayURL)
 
 	data := url.Values{}
 	data.Set("grant_type", "client_credentials")
